@@ -68,7 +68,6 @@ module TestLib =
                     TestErrors =  resL
                 })
  
- 
             
 (******************************************************************************************
    This submodule contains a set of functions that enable random data generation
@@ -319,6 +318,34 @@ module HLPTick3 =
                 | Ok sheet -> showSheetInIssieSchematic sheet dispatch
                 | Error mess -> ()
             result
+
+        ///// Ensures no overlaping symbols during test
+        //let runTestOnSheets2
+        //    (name: string)
+        //    (sampleToStartFrom: int)
+        //    (samples : Gen<'a>)
+        //    (sheetMaker: 'a -> SheetT.Model)
+        //    (sheetChecker: int -> SheetT.Model -> string option)
+        //    (dispatch: Dispatch<Msg>)
+        //        : TestResult<'a> =
+        //    let generateAndCheckSheet n = sheetMaker >> sheetChecker n
+        //    let result =
+        //        {
+        //            Name=name;
+        //            Samples=samples;
+        //            StartFrom = sampleToStartFrom
+        //            Assertion = generateAndCheckSheet
+        //        }
+        //        |> runTests
+        //    match result.TestErrors with
+        //    | [] -> // no errors
+        //        printf $"Test {result.TestName} has PASSED."
+        //    | (n,first):: _ -> // display in Issie editor and print out first error
+        //        printf $"Test {result.TestName} has FAILED on sample {n} with error message:\n{first}"
+        //        match catchException "" sheetMaker (samples.Data n) with
+        //        | Ok sheet -> showSheetInIssieSchematic sheet dispatch
+        //        | Error mess -> ()
+        //    result
 //--------------------------------------------------------------------------------------------------//
 //----------------------------------------Example Test Circuits using Gen<'a> samples---------------//
 //--------------------------------------------------------------------------------------------------//
@@ -329,16 +356,18 @@ module HLPTick3 =
         fromList [-100..20..100]
         |> map (fun n -> middleOfSheet + {X=float n; Y=0.})
 
-    /// Sample data based on a rectangular 2D grid created from samples using GenerateDate.product
-    let twoDimensionalGrid =
-        let xRange = [-5.0..5.0]
-        let yRange = [-5.0..5.0]
-        let genX = fromList xRange
-        let genY = fromList yRange
-        product (fun x y -> {X = x; Y = y}) genX genY
-        |> map (fun point -> middleOfSheet + point)
+    /// Fail when sheet contains two symbols which overlap
+    let failOnSymbolIntersect (sheet: SheetT.Model) =
+        let wireModel = sheet.Wire
+        let boxes =
+            mapValues sheet.BoundingBoxes
+            |> Array.toList
+            |> List.mapi (fun n box -> n,box)
+        List.allPairs boxes boxes 
+        |> List.exists (fun ((n1,box1),(n2,box2)) -> (n1 <> n2) && BlockHelpers.overlap2DBox box1 box2)
+        |> (function | true -> true
+                         | false -> false)
 
-    //printfn "%A" twoDimensionalGrid 
 
     /// demo test circuit consisting of a DFF & And gate
     let makeTest1Circuit (andPos:XYPos) =
@@ -349,7 +378,22 @@ module HLPTick3 =
         |> Result.bind (placeWire (portOf "FF1" 0) (portOf "G1" 0) )
         |> getOkOrFail
 
+    let doesSymbolOverlap (position: XYPos) =
+        let testSheet = makeTest1Circuit position
+        match failOnSymbolIntersect testSheet with
+        | true -> true  // Overlap exists
+        | false -> false   // No overlap
 
+    /// Sample data based on a rectangular 2D grid created from samples using GenerateDate.product
+    let twoDimensionalGrid =
+        let xRange = [-100.0..100.0]
+        let yRange = [-100.0..100.0]
+        let genX = fromList xRange
+        let genY = fromList yRange
+        product (fun x y -> {X = x; Y = y}) genX genY
+        |> map (fun point -> middleOfSheet + point)
+        |> filter (fun point -> not (doesSymbolOverlap point))
+      
 
 //------------------------------------------------------------------------------------------------//
 //-------------------------Example assertions used to test sheets---------------------------------//
