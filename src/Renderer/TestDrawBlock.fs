@@ -329,6 +329,17 @@ module HLPTick3 =
         fromList [-100..20..100]
         |> map (fun n -> middleOfSheet + {X=float n; Y=0.})
 
+    /// Sample data based on a rectangular 2D grid created from samples using GenerateDate.product
+    let twoDimensionalGrid =
+        let xRange = [-5.0..5.0]
+        let yRange = [-5.0..5.0]
+        let genX = fromList xRange
+        let genY = fromList yRange
+        product (fun x y -> {X = x; Y = y}) genX genY
+        |> map (fun point -> middleOfSheet + point)
+
+    //printfn "%A" twoDimensionalGrid 
+
     /// demo test circuit consisting of a DFF & And gate
     let makeTest1Circuit (andPos:XYPos) =
         initSheetModel
@@ -446,6 +457,17 @@ module HLPTick3 =
                 dispatch
             |> recordPositionInTest testNum dispatch
 
+        /// Test to find errors in the standard smart routing algorithm
+        let test5 testNum firstSample dispatch =
+            runTestOnSheets
+                "Grid"
+                firstSample
+                twoDimensionalGrid
+                makeTest1Circuit
+                Asserts.failOnWireIntersectsSymbol
+                dispatch
+            |> recordPositionInTest testNum dispatch
+
         /// List of tests available which can be run ftom Issie File Menu.
         /// The first 9 tests can also be run via Ctrl-n accelerator keys as shown on menu
         let testsToRunFromSheetMenu : (string * (int -> int -> Dispatch<Msg> -> Unit)) list =
@@ -456,7 +478,7 @@ module HLPTick3 =
                 "Test2", test2 // example
                 "Test3", test3 // example
                 "Test4", test4 
-                "Test5", fun _ _ _ -> printf "Test5" // dummy test - delete line or replace by real test as needed
+                "Test5", test5 // dummy test - delete line or replace by real test as needed
                 "Test6", fun _ _ _ -> printf "Test6"
                 "Test7", fun _ _ _ -> printf "Test7"
                 "Test8", fun _ _ _ -> printf "Test8"
