@@ -508,6 +508,7 @@ module HLPTick3 =
                 firstSample
                 twoDimensionalGrid
                 makeTest1Circuit
+                //Asserts.failOnSymbolIntersectsSymbol
                 Asserts.failOnWireIntersectsSymbol
                 dispatch
             |> recordPositionInTest testNum dispatch
