@@ -86,10 +86,11 @@ module HLPTick3 =
     open Helpers
     open CommonTypes
     open ModelType
-    open DrawModelType
+    open DrawModelType // imports tools for adding wires and rotations etc see DrawModelType.fs
     open Sheet.SheetInterface
     open GenerateData
     open TestLib
+    open RotateScale
 
     /// create an initial empty Sheet Model 
     let initSheetModel = DiagramMainView.init().Sheet
@@ -197,9 +198,9 @@ module HLPTick3 =
                 model
                 |> Optic.set symbolModel_ symModel
                 |> SheetUpdate.updateBoundingBoxes // could optimise this by only updating symId bounding boxes
-                |> Ok
-        
+                |> Ok      
 
+           
 
     
         /// Place a new symbol onto the Sheet with given position and scaling (use default scale if this is not specified).
@@ -234,13 +235,88 @@ module HLPTick3 =
             
         
 
-        // Rotate a symbol
-        let rotateSymbol (symLabel: string) (rotate: Rotation) (model: SheetT.Model) : (SheetT.Model) =
-            failwithf "Not Implemented"
+        // TODO Rotate a symbol
+        let rotateSymbol (symLabel: string) (rotate: Rotation) (model: SheetT.Model) : SheetT.Model =
+            // Convert the label to uppercase to ensure case-insensitive comparison
+            let symLabelUpper = symLabel.ToUpper()
 
-        // Flip a symbol
-        let flipSymbol (symLabel: string) (flip: SymbolT.FlipType) (model: SheetT.Model) : (SheetT.Model) =
-            failwithf "Not Implemented"
+            // Find the component ID for the given label
+            let maybeCompId = model.Wire.Symbol.Symbols |> Map.tryFindKey (fun _ sym -> sym.Component.Label.ToUpper() = symLabelUpper)
+
+            match maybeCompId with
+            | Some compId ->
+                let symModel = model.Wire.Symbol // Extract SymbolT.Model from SheetT.Model
+                let rotatedSymModelResult = rotateBlock [compId] symModel rotate
+                // Now you need to integrate rotatedSymModelResult back into SheetT.Model
+                
+                // Assuming you have a mechanism to replace the SymbolT.Model within SheetT.Model
+                let updatedModel = { model with Wire = { model.Wire with Symbol = rotatedSymModelResult } }
+                updatedModel          
+
+
+            | None ->
+                // If the symbol wasn't found, just return the original model
+                model
+
+        // TODO Flip a symbol
+        let flipSymbol (symLabel: string) (flip: SymbolT.FlipType) (model: SheetT.Model) : SheetT.Model =
+            let symLabelUpper = symLabel.ToUpper()
+
+            // Find the component ID for the given label
+            let maybeCompId = model.Wire.Symbol.Symbols |> Map.tryFindKey (fun _ sym -> sym.Component.Label.ToUpper() = symLabelUpper)
+
+            match maybeCompId with
+            | Some compId ->
+                let symModel = model.Wire.Symbol // Extract SymbolT.Model from SheetT.Model
+                let flippedSymbolResult = flipBlock [compId] symModel flip
+                // Now you need to integrate rotatedSymModelResult back into SheetT.Model
+                
+                // Assuming you have a mechanism to replace the SymbolT.Model within SheetT.Model
+                let updatedModel = { model with Wire = { model.Wire with Symbol = flippedSymbolResult } }
+                updatedModel
+            | None ->
+                model
+
+            /// Used to randomly select a rotation
+        let randomRotation () =
+            match random.Next(0, 4) with
+            | 0 -> Degree0
+            | 1 -> Degree90
+            | 2 -> Degree180
+            | 3 -> Degree270
+            | _ -> Degree0 // This case will never be reached
+
+        /// Used to randomly select a flip type
+        let randomFlipType () =
+            match random.Next(0, 2) with
+            | 0 -> SymbolT.FlipHorizontal
+            | 1 -> SymbolT.FlipVertical
+            | _ -> SymbolT.FlipHorizontal // This case will never be reached
+
+        /// Place a new symbol onto the Sheet with given position and randomly rotate and flip the symbol.
+        let placeSymbolWithRotationAndFlip 
+            (symLabel: string) 
+            (compType: ComponentType) 
+            (position: XYPos) 
+            (model: SheetT.Model) : Result<SheetT.Model, string> =
+
+            let rotation = randomRotation()
+            let flip = randomFlipType()
+            // Existing logic to place the symbol
+            let result = placeSymbol symLabel compType position model
+            match result with
+            | Error e -> Error e
+            | Ok model ->
+                // Apply rotation and flip if the symbol was successfully placed
+                let rotatedModel = rotateSymbol symLabel rotation model
+                let flippedModel = flipSymbol symLabel flip rotatedModel // Flip the model after rotatinig it
+                match random.Next(0, 3) with
+                | 0 -> Ok flippedModel
+                | 1 -> Ok rotatedModel
+                | 2 -> Ok model
+                | _ -> Ok model // This case will never be reached
+
+             
 
         /// Add a (newly routed) wire, source specifies the Output port, target the Input port.
         /// Return an error if either of the two ports specified is invalid, or if the wire duplicates and existing one.
@@ -318,34 +394,6 @@ module HLPTick3 =
                 | Ok sheet -> showSheetInIssieSchematic sheet dispatch
                 | Error mess -> ()
             result
-
-        ///// Ensures no overlaping symbols during test
-        //let runTestOnSheets2
-        //    (name: string)
-        //    (sampleToStartFrom: int)
-        //    (samples : Gen<'a>)
-        //    (sheetMaker: 'a -> SheetT.Model)
-        //    (sheetChecker: int -> SheetT.Model -> string option)
-        //    (dispatch: Dispatch<Msg>)
-        //        : TestResult<'a> =
-        //    let generateAndCheckSheet n = sheetMaker >> sheetChecker n
-        //    let result =
-        //        {
-        //            Name=name;
-        //            Samples=samples;
-        //            StartFrom = sampleToStartFrom
-        //            Assertion = generateAndCheckSheet
-        //        }
-        //        |> runTests
-        //    match result.TestErrors with
-        //    | [] -> // no errors
-        //        printf $"Test {result.TestName} has PASSED."
-        //    | (n,first):: _ -> // display in Issie editor and print out first error
-        //        printf $"Test {result.TestName} has FAILED on sample {n} with error message:\n{first}"
-        //        match catchException "" sheetMaker (samples.Data n) with
-        //        | Ok sheet -> showSheetInIssieSchematic sheet dispatch
-        //        | Error mess -> ()
-        //    result
 //--------------------------------------------------------------------------------------------------//
 //----------------------------------------Example Test Circuits using Gen<'a> samples---------------//
 //--------------------------------------------------------------------------------------------------//
@@ -378,6 +426,15 @@ module HLPTick3 =
         |> Result.bind (placeWire (portOf "FF1" 0) (portOf "G1" 0) )
         |> getOkOrFail
 
+    /// Randomly rotate and flip the symbols in the test circuit
+    let makeTest1CircuitwithRotation (andPos:XYPos) =
+        initSheetModel
+        |> placeSymbolWithRotationAndFlip "G1" (GateN(And,2)) andPos 
+        |> Result.bind (placeSymbolWithRotationAndFlip "FF1" DFF middleOfSheet)
+        |> Result.bind (placeWire (portOf "G1" 0) (portOf "FF1" 0))
+        |> Result.bind (placeWire (portOf "FF1" 0) (portOf "G1" 0) )
+        |> getOkOrFail
+
     let doesSymbolOverlap (position: XYPos) =
         let testSheet = makeTest1Circuit position
         match failOnSymbolIntersect testSheet with
@@ -386,8 +443,9 @@ module HLPTick3 =
 
     /// Sample data based on a rectangular 2D grid created from samples using GenerateDate.product
     let twoDimensionalGrid =
-        let xRange = [-100.0..100.0]
+        let xRange = [-80.0..80.0]
         let yRange = [-100.0..100.0]
+        // randomly shuffle the x annd y ranges to get a random grid
         let genX = fromList xRange
         let genY = fromList yRange
         product (fun x y -> {X = x; Y = y}) genX genY
@@ -463,7 +521,7 @@ module HLPTick3 =
                 "Horizontally positioned AND + DFF: fail on sample 0"
                 firstSample
                 horizLinePositions
-                makeTest1Circuit
+                makeTest1CircuitwithRotation
                 (Asserts.failOnSampleNumber 0)
                 dispatch
             |> recordPositionInTest testNum dispatch
@@ -474,7 +532,7 @@ module HLPTick3 =
                 "Horizontally positioned AND + DFF: fail on sample 10"
                 firstSample
                 horizLinePositions
-                makeTest1Circuit
+                makeTest1CircuitwithRotation
                 (Asserts.failOnSampleNumber 10)
                 dispatch
             |> recordPositionInTest testNum dispatch
@@ -485,7 +543,7 @@ module HLPTick3 =
                 "Horizontally positioned AND + DFF: fail on symbols intersect"
                 firstSample
                 horizLinePositions
-                makeTest1Circuit
+                makeTest1CircuitwithRotation
                 Asserts.failOnSymbolIntersectsSymbol
                 dispatch
             |> recordPositionInTest testNum dispatch
@@ -496,7 +554,7 @@ module HLPTick3 =
                 "Horizontally positioned AND + DFF: fail all tests"
                 firstSample
                 horizLinePositions
-                makeTest1Circuit
+                makeTest1CircuitwithRotation
                 Asserts.failOnAllTests
                 dispatch
             |> recordPositionInTest testNum dispatch
@@ -507,7 +565,7 @@ module HLPTick3 =
                 "Grid"
                 firstSample
                 twoDimensionalGrid
-                makeTest1Circuit
+                makeTest1CircuitwithRotation
                 //Asserts.failOnSymbolIntersectsSymbol
                 Asserts.failOnWireIntersectsSymbol
                 dispatch
