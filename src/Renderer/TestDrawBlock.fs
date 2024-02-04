@@ -441,10 +441,16 @@ module HLPTick3 =
         | true -> true  // Overlap exists
         | false -> false   // No overlap
 
+    let shuffleList listToShuffle =
+        listToShuffle
+        |> Array.ofList  // Convert list to array
+        |> shuffleA      // Shuffle the array
+        |> Array.toList  // Convert back to list
+
     /// Sample data based on a rectangular 2D grid created from samples using GenerateDate.product
     let twoDimensionalGrid =
-        let xRange = [-80.0..80.0]
-        let yRange = [-100.0..100.0]
+        let xRange = shuffleList [-80.0..80.0]
+        let yRange = shuffleList [-100.0..100.0]
         // randomly shuffle the x annd y ranges to get a random grid
         let genX = fromList xRange
         let genY = fromList yRange
