@@ -442,8 +442,19 @@ module HLPTick3 =
 
     /// Sample data based on a rectangular 2D grid created from samples using GenerateDate.product
     let twoDimensionalGrid =
-        let xRange = shuffleList [-80.0..80.0]
-        let yRange = shuffleList [-100.0..100.0]
+        let xRange =  [-100.0..5.0..100.0]
+        let yRange = shuffleList [-100.0..5.0..100.0]
+        // randomly shuffle the x annd y ranges to get a random grid
+        let genX = fromList xRange
+        let genY = fromList yRange
+        product (fun x y -> {X = x; Y = y}) genX genY
+        |> map (fun point -> middleOfSheet + point)
+        |> filter (fun point -> not (doesSymbolOverlap point))
+
+    /// Sample data based on a rectangular 2D grid created from samples using GenerateDate.product
+    let twoDimensionalGridRotate =
+        let xRange = shuffleList [-200.0..20.0..200.0]
+        let yRange = shuffleList [-250.0..25.0..250.0]
         // randomly shuffle the x annd y ranges to get a random grid
         let genX = fromList xRange
         let genY = fromList yRange
@@ -564,8 +575,18 @@ module HLPTick3 =
                 "Grid"
                 firstSample
                 twoDimensionalGrid
+                makeTest1Circuit
+                Asserts.failOnWireIntersectsSymbol
+                dispatch
+            |> recordPositionInTest testNum dispatch
+
+         /// Test to find errors in the standard smart routing algorithm with rotations and flips
+        let test6 testNum firstSample dispatch =
+            runTestOnSheets
+                "Random "
+                firstSample
+                twoDimensionalGridRotate
                 makeTest1CircuitwithRotation
-                //Asserts.failOnSymbolIntersectsSymbol
                 Asserts.failOnWireIntersectsSymbol
                 dispatch
             |> recordPositionInTest testNum dispatch
@@ -580,8 +601,8 @@ module HLPTick3 =
                 "Test2", test2 // example
                 "Test3", test3 // example
                 "Test4", test4 
-                "Test5", test5 // dummy test - delete line or replace by real test as needed
-                "Test6", fun _ _ _ -> printf "Test6"
+                "Test5", test5 
+                "Test6", test6
                 "Test7", fun _ _ _ -> printf "Test7"
                 "Test8", fun _ _ _ -> printf "Test8"
                 "Next Test Error", fun _ _ _ -> printf "Next Error:" // Go to the nexterror in a test
