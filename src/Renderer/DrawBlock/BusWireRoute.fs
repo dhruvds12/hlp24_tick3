@@ -489,15 +489,15 @@ let snapToNet (model: Model) (wireToRoute: Wire) : Wire =
 /// it is called every time a new wire is created, so is easily tested.
 let smartAutoroute (model: Model) (wire: Wire) : Wire =
      
-    let initialWire = (autoroute model wire)
+    let initialWire = (autoroute model wire) // Generate inital path for the wires
     
     // Snapping to Net only if model.SnapToNet toggled to be true
     let snappedToNetWire =
         match model.SnapToNet with
         | _ -> initialWire // do not snap
-        //| true -> snapToNet model initialWire
+        //| true -> snapToNet model initialWire //IGNORED -> maybe enable this to improve performance
 
-    let intersectedBoxes = findWireSymbolIntersections model snappedToNetWire 
+    let intersectedBoxes = findWireSymbolIntersections model snappedToNetWire // return bounding box of intersections
 
     match intersectedBoxes.Length with
     | 0 -> snappedToNetWire
