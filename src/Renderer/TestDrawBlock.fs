@@ -237,7 +237,6 @@ module HLPTick3 =
 
         // TODO Rotate a symbol
         let rotateSymbol (symLabel: string) (rotate: Rotation) (model: SheetT.Model) : SheetT.Model =
-            // Convert the label to uppercase to ensure case-insensitive comparison
             let symLabelUpper = symLabel.ToUpper()
 
             // Find the component ID for the given label
@@ -245,11 +244,8 @@ module HLPTick3 =
 
             match maybeCompId with
             | Some compId ->
-                let symModel = model.Wire.Symbol // Extract SymbolT.Model from SheetT.Model
+                let symModel = model.Wire.Symbol
                 let rotatedSymModelResult = rotateBlock [compId] symModel rotate
-                // Now you need to integrate rotatedSymModelResult back into SheetT.Model
-                
-                // Assuming you have a mechanism to replace the SymbolT.Model within SheetT.Model
                 let updatedModel = { model with Wire = { model.Wire with Symbol = rotatedSymModelResult } }
                 updatedModel          
 
@@ -267,11 +263,8 @@ module HLPTick3 =
 
             match maybeCompId with
             | Some compId ->
-                let symModel = model.Wire.Symbol // Extract SymbolT.Model from SheetT.Model
+                let symModel = model.Wire.Symbol 
                 let flippedSymbolResult = flipBlock [compId] symModel flip
-                // Now you need to integrate rotatedSymModelResult back into SheetT.Model
-                
-                // Assuming you have a mechanism to replace the SymbolT.Model within SheetT.Model
                 let updatedModel = { model with Wire = { model.Wire with Symbol = flippedSymbolResult } }
                 updatedModel
             | None ->
